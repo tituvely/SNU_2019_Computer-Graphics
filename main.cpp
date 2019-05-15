@@ -58,6 +58,8 @@ vector<vector<float>> scalevec;
 vector<vector<vector<float>>> translatevec;
 vector<vector<glm::quat>> rotatevec;
 
+vector<vector<vector<vector<float>>>> rotatedcoord;
+
 /* vectors that makes the rotation and translation of the cube */
 float eye[3] = { 0.0f, 0.0f, 100.0f };
 float ori[3] = { 0.0f, 0.0f, 0.0f };
@@ -276,7 +278,7 @@ float CatmullRoll(float t, float p0, float p1, float p2, float p3)
     
     /* Catmull Rom spline Calculation */
     v = ((2 * p1) + (-p0 + p2) * t + (2*p0 - 5*p1 + 4*p2 - p3) * t2 + (-p0 + 3*p1 - 3*p2 + p3) * t3) * 0.5f;
-  
+    
     return v;
 }
 
@@ -302,9 +304,9 @@ void DrawCatmullRollSplines() {
         glRotatef(transformations[i][1][0], transformations[i][1][1], transformations[i][1][2], transformations[i][1][3]);
         glTranslatef(transformations[i][2][0], transformations[i][2][1], transformations[i][2][2]);
         glScalef(transformations[i][0][0], transformations[i][0][0], transformations[i][0][0]);
-
+        
         for (int j = -1 ; j < numOfControlPoints - 2; j++) {
-            for(float t=0;t<1;t+=0.01) {
+            for(float t=0;t<1;t+=0.2) {
                 if(j == -1) {
                     x = CatmullRoll(t,coord[i][numOfControlPoints - 1][0],coord[i][0][0],coord[i][1][0],coord[i][2][0]);
                     y = CatmullRoll(t,coord[i][numOfControlPoints - 1][1],coord[i][0][1],coord[i][1][1],coord[i][2][1]);
@@ -316,7 +318,7 @@ void DrawCatmullRollSplines() {
                     y = CatmullRoll(t,coord[i][j][1],coord[i][j+1][1],coord[i][j+2][1],coord[i][j+3][1]);
                 }
                 glBegin(GL_POINTS);
-                    glVertex3f(x,0,y);
+                glVertex3f(x,0,y);
                 glEnd();
             }
         }
@@ -336,7 +338,7 @@ void DrawBSplines() {
         glScalef(transformations[i][0][0], transformations[i][0][0], transformations[i][0][0]);
         
         for (int j = -1 ; j < numOfControlPoints - 2; j++) {
-            for(float t=0;t<1;t+=0.01) {
+            for(float t=0;t<1;t+=0.2) {
                 if(j == -1) {
                     x = BSpline(t,coord[i][numOfControlPoints - 1][0],coord[i][0][0],coord[i][1][0],coord[i][2][0]);
                     y = BSpline(t,coord[i][numOfControlPoints - 1][1],coord[i][0][1],coord[i][1][1],coord[i][2][1]);
@@ -348,7 +350,7 @@ void DrawBSplines() {
                     y = BSpline(t,coord[i][j][1],coord[i][j+1][1],coord[i][j+2][1],coord[i][j+3][1]);
                 }
                 glBegin(GL_POINTS);
-                    glVertex3f(x,0,y);
+                glVertex3f(x,0,y);
                 glEnd();
             }
         }
@@ -360,7 +362,7 @@ void MakeScaleSpline() {
     for(int i = -1; i < numOfCrossSections - 2; i++) {
         scalevec.push_back(vector<float>());
         float s;    //Interpolated point
-        for(float t=0;t<1;t+=0.01) {
+        for(float t=0;t<1;t+=0.2) {
             if(i == -1) {
                 s = CatmullRoll(t,transformations[numOfCrossSections - 1][0][0],transformations[0][0][0],transformations[1][0][0],transformations[2][0][0]);
             } else if (i == numOfCrossSections - 3)  {
@@ -378,7 +380,7 @@ void MakeTranslateSpline() {
         translatevec.push_back(vector<vector<float>>());
         float x,y,z;    //Interpolated point
         int index=0;
-        for(float t=0;t<1;t+=0.01) {
+        for(float t=0;t<1;t+=0.2) {
             translatevec.at(i+1).push_back(vector<float>());
             if(i == -1) {
                 x = CatmullRoll(t,transformations[numOfCrossSections - 1][2][0],transformations[0][2][0],transformations[1][2][0],transformations[2][2][0]);
@@ -420,7 +422,7 @@ void MakeRotateSpline() {
         w = cos(transformations[i+1][1][0]/2);
         glm::quat quat2= glm::quat(w,x,y,z);
         
-        for(float t=0;t<1;t+=0.01) {
+        for(float t=0;t<1;t+=0.1) {
             // 쿼터니언 계산
             glm::quat interpolatedquat = mix(quat1, quat2, t);
             rotatevec.at(i).push_back(interpolatedquat);
@@ -428,52 +430,141 @@ void MakeRotateSpline() {
     }
 }
 
-void Mesh() {
+void MakeVertex() {
     glLineWidth(1);
     glColor3f(0.1,0.5,0.601961);
     
-    for(int i = 0 ; i < numOfCrossSections - 1; i++) {
-        float x, y;    //Interpolated point
+    glPushMatrix();
+    for(int i = 0 ; i < numOfCrossSections; i++) {
+        rotatedcoord.push_back(vector<vector<vector<float>>>());
+        float x, z;    //Interpolated point
         for (int j = 0 ; j < numOfControlPoints; j++) {
+            rotatedcoord.at(i).push_back(vector<vector<float>>());
             int index=0;
             x = coord[i][j][0];
-            y = coord[i][j][1];
-            for(float t=0;t<1;t+=0.01) {
+            z = coord[i][j][1];
+            
+            if(i == numOfCrossSections - 1) {
+                rotatedcoord.at(i).at(j).push_back(vector<float>());
                 glPushMatrix();
-                //rotationMatrix를 구함
-                GLdouble _updatedMatrix[16]{
-                    1, 0, 0, 0,
-                    0, 1, 0, 0,
-                    0, 0, 1, 0,
-                    0, 0, 0, 1
-                };
-                glm::quat q = rotatevec.at(i).at(index);
-                QuaternionToMatrix(_updatedMatrix, q.w, q.x, q.y, q.z);
-
-                float angle, rx, ry, rz;
-                float scale = sqrt(q.x * q.x + q.y * q.y + q.z * q.z);
-                if (scale < 0.001) { // test to avoid divide by zero, s is always positive due to sqrt
-                    rx = 1;
-                    ry = 0;
-                    rz = 0;
-                } else {
-                    rx = q.x / scale; // normalise axis
-                    ry = q.y / scale;
-                    rz = q.z / scale;
-                }
-
-                angle = acos(q.w) * 2.0f;
-
-                glRotatef(angle, rx, ry, rz);
-                glTranslatef(translatevec.at(i).at(index).at(0), translatevec.at(i).at(index).at(1), translatevec.at(i).at(index).at(2));
-                glScalef(scalevec.at(i).at(index), scalevec.at(i).at(index), scalevec.at(i).at(index));
-
-                glBegin(GL_POINTS);
-                    glVertex3f(x,0,y);
-                glEnd();
+                glRotatef(transformations[i][1][0], transformations[i][1][1], transformations[i][1][2], transformations[i][1][3]);
+                glTranslatef(transformations[i][2][0], transformations[i][2][1], transformations[i][2][2]);
+                glScalef(transformations[i][0][0], transformations[i][0][0], transformations[i][0][0]);
+                
+                GLdouble m[16];
+                glGetDoublev(GL_MODELVIEW_MATRIX, m);
+                
+                float xx, yy, zz;
+                xx = x*m[0] + 0*m[4] + z*m[8] + m[12];
+                yy = x*m[1] + 0*m[5] + z*m[9] + m[13];
+                zz = x*m[2] + 0*m[6] + z*m[10] + m[14] + 100.0;
+                
+                rotatedcoord.at(i).at(j).at(0).push_back(xx);
+                rotatedcoord.at(i).at(j).at(0).push_back(yy);
+                rotatedcoord.at(i).at(j).at(0).push_back(zz);
                 glPopMatrix();
+            } else {
+                for(float t=0;t<1;t+=0.2) {
+                    rotatedcoord.at(i).at(j).push_back(vector<float>());
+                    glPushMatrix();
+                    
+                    //rotationMatrix를 구함
+                    GLdouble _updatedMatrix[16]{
+                        1, 0, 0, 0,
+                        0, 1, 0, 0,
+                        0, 0, 1, 0,
+                        0, 0, 0, 1
+                    };
+                    glm::quat q = rotatevec.at(i).at(index);
+                    QuaternionToMatrix(_updatedMatrix, q.w, q.x, q.y, q.z);
+                    
+                    float angle, rx, ry, rz;
+                    float scale = sqrt(q.x * q.x + q.y * q.y + q.z * q.z);
+                    if (scale < 0.001) {  // test to avoid divide by zero, s is always positive due to sqrt
+                        rx = 1;
+                        ry = 0;
+                        rz = 0;
+                    } else {
+                        rx = q.x / scale; // normalise axis
+                        ry = q.y / scale;
+                        rz = q.z / scale;
+                    }
+                    
+                    angle = acos(q.w) * 2.0f;
+                    
+                    glRotatef(angle, rx, ry, rz);
+                    glTranslatef(translatevec.at(i).at(index).at(0), translatevec.at(i).at(index).at(1), translatevec.at(i).at(index).at(2));
+                    glScalef(scalevec.at(i).at(index), scalevec.at(i).at(index), scalevec.at(i).at(index));
+                    
+                    GLdouble m[16];
+                    glGetDoublev(GL_MODELVIEW_MATRIX, m);
+                    float xx, yy, zz;
+                    xx = x*m[0] + 0*m[4] + z*m[8] + m[12];
+                    yy = x*m[1] + 0*m[5] + z*m[9] + m[13];
+                    zz = x*m[2] + 0*m[6] + z*m[10] + m[14] + 100.0;
+                    
+                    rotatedcoord.at(i).at(j).at(index).push_back(xx);
+                    rotatedcoord.at(i).at(j).at(index).push_back(yy);
+                    rotatedcoord.at(i).at(j).at(index).push_back(zz);
+                    
+                    glPopMatrix();
+                    index++;
+                }
+            }
+        }
+    }
+    
+    glPopMatrix();
+}
+
+void Mesh() {
+    //  Vertical
+    for(int i = 0 ; i < numOfCrossSections - 1; i++) {
+        float x,y,z;
+        for (int j = 0 ; j < numOfControlPoints; j++) {
+            glBegin(GL_LINE_STRIP);
+            int index=0;
+            for(float t=0;t<1;t+=0.2) {
+                x = rotatedcoord.at(i).at(j).at(index).at(0);
+                y = rotatedcoord.at(i).at(j).at(index).at(1);
+                z = rotatedcoord.at(i).at(j).at(index).at(2);
+                
+                glVertex3f(x,y,z);
                 index++;
             }
+            x = rotatedcoord.at(i+1).at(j).at(0).at(0);
+            y = rotatedcoord.at(i+1).at(j).at(0).at(1);
+            z = rotatedcoord.at(i+1).at(j).at(0).at(2);
+            glVertex3f(x,y,z);
+            glEnd();
+        }
+    }
+    
+    // Horizontal
+    for(int i = 0 ; i < numOfCrossSections; i++) {
+        float x,y,z;
+        if(i < numOfCrossSections - 1) {
+            int index=0;
+            for(float t=0;t<1;t+=0.2) {
+                glBegin(GL_LINE_STRIP);
+                for (int j = 0 ; j < numOfControlPoints; j++) {
+                    x = rotatedcoord.at(i).at(j).at(index).at(0);
+                    y = rotatedcoord.at(i).at(j).at(index).at(1);
+                    z = rotatedcoord.at(i).at(j).at(index).at(2);
+                    glVertex3f(x,y,z);
+                }
+                index++;
+                glEnd();
+            }
+        } else {
+            glBegin(GL_LINE_STRIP);
+            for (int j = 0 ; j < numOfControlPoints; j++) {
+                x = rotatedcoord.at(i).at(j).at(0).at(0);
+                y = rotatedcoord.at(i).at(j).at(0).at(1);
+                z = rotatedcoord.at(i).at(j).at(0).at(2);
+                glVertex3f(x,y,z);
+            }
+            glEnd();
         }
     }
 }
@@ -482,10 +573,10 @@ void display() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
     loadGlobalCoord();
-
-//    drawAxis();
     
-//    DrawControlPoints();
+    drawAxis();
+    
+    //    DrawControlPoints();
     
     if (curveType == "BSPLINE") {
         DrawBSplines();
@@ -496,6 +587,8 @@ void display() {
     MakeScaleSpline();
     MakeRotateSpline();
     MakeTranslateSpline();
+    
+    MakeVertex();
     
     Mesh();
     
@@ -566,7 +659,7 @@ void loadFile(char *fname) {
     if (myfile.is_open())
     {
         myfile >> curveType >> numOfCrossSections >> numOfControlPoints;
-    
+        
         for(int i = 0 ; i < numOfCrossSections; i++) {
             for (int j = 0 ; j < numOfControlPoints; j++) {
                 float x, y;
@@ -597,7 +690,7 @@ void loadFile(char *fname) {
             transformations.at(i).at(2).push_back(translationY);   // transformations[i][2][1];
             transformations.at(i).at(2).push_back(translationZ);   // transformations[i][2][2];
         }
-         myfile.close();
+        myfile.close();
     }
     else cout << "Unable to open file";
 }
